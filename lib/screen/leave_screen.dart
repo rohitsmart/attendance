@@ -35,6 +35,7 @@ class Leave {
   }
 }
 
+
 class MyLeavesScreen extends StatefulWidget {
   final String token;
 
@@ -79,6 +80,7 @@ class _MyLeavesScreenState extends State<MyLeavesScreen> {
       body: SingleChildScrollView(
         child: GridView.builder(
           shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 8,
