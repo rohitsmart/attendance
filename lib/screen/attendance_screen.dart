@@ -70,6 +70,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> responseData = json.decode(response.body);
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final DateTime now = DateTime.now();
+      final String todayDate = DateFormat('yyyy-MM-dd').format(now);
+      final String storedDate = prefs.getString('attendanceDate') ?? '';
+      if (storedDate != todayDate) {
+        final List<dynamic> attendanceList = responseData['filterAttendance'];
+        if (attendanceList.isNotEmpty) {
+          prefs.setString('attendanceDate', todayDate);
+          final String inTime = attendanceList[0]['in_time'];
+          prefs.setString('todayInTime', inTime);
+        }
+      }
       setState(() {
         _attendanceData = responseData['filterAttendance'];
       });

@@ -30,7 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login(BuildContext context) async {
-    final String email = emailController.text.trim();
+    String email = '${emailController.text.trim()}@perfectkode.com';
+
     final String password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
@@ -175,7 +176,10 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                hintText: 'Your email without @perfectkode.com',
+              ),
             ),
           TextFormField(
             controller: passwordController,
