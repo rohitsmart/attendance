@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../component/timer.dart';
 import 'apply_leave_screen.dart';
 import 'leave_screen.dart';
 
@@ -25,68 +26,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const _attendanceIcon = AssetImage('lib/assets/attendance.png');
   static const _leavesIcon = AssetImage('lib/assets/leave.png');
   static const _punchIcon = AssetImage('lib/assets/TimeIn.png');
-
   late String _token;
-  late Timer _timer;
-  String _timerText = '00:00:00';
-  String _inTime = '';
 
   @override
   void initState() {
     super.initState();
     _token = widget.token;
-    _startClock();
-
-  }
-  void _startClock() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final DateTime now = DateTime.now();
-    final String todayDate = DateFormat('yyyy-MM-dd').format(now);
-    final String storedDate = prefs.getString('attendanceDate') ?? '';
-    if (storedDate == todayDate) {
-      _inTime = prefs.getString('todayInTime') ?? '';
-      print('Starting timer from $_inTime');
-    }
-    else{
-      _inTime = '00:00:00';
-    }
-
-    }
-
-  void _startTimer(Duration difference) {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _timerText = _formatDuration(difference + Duration(seconds: timer.tick));
-      });
-    });
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
   }
 
   bool isSameDay(DateTime d1, DateTime d2) {
     return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
-  }
-
-  Widget _buildTimerWidget() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.all(8.0),
-      child: Text(
-        _timerText, // Display the actual timer value
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
   }
 
   @override
@@ -94,12 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: _buildTimerWidget(), // Add the timer widget here
-          ),
-        ],
         leading: Builder(
           builder: (BuildContext context) {
             return IconButton(
@@ -143,7 +86,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => MyLeavesScreen(_token)),
+                            MaterialPageRoute(
+                                builder: (context) => MyLeavesScreen(_token)),
                           );
                         },
                       ),
@@ -152,7 +96,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => ApplyLeaveScreen(_token)),
+                            MaterialPageRoute(
+                                builder: (context) => ApplyLeaveScreen(_token)),
                           );
                         },
                       ),
@@ -164,19 +109,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       // Navigate to Attendance screen
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => AttendanceScreen(_token)),
+                        MaterialPageRoute(builder: (context) =>
+                            AttendanceScreen(_token)),
                       );
                     },
                   ),
                   ListTile(
                     title: const Text('Policy'),
-                    onTap: () {
-                    },
+                    onTap: () {},
                   ),
                   ListTile(
                     title: const Text('Tasks'),
-                    onTap: () {
-                    },
+                    onTap: () {},
                   ),
                   ListTile(
                     title: const Text('Logout'),
@@ -188,10 +132,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         ),
       ),
-
-
-
-
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
@@ -228,7 +168,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             case 1: // Attendance
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => AttendanceScreen(_token)),
+                MaterialPageRoute(
+                    builder: (context) => AttendanceScreen(_token)),
               );
               break;
             case 2: // My Leaves
@@ -240,7 +181,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         },
       ),
-
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -313,17 +253,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            TimerText(), // Add TimerText widget here
           ],
         ),
       ),
-
     );
   }
 
   Future<void> _markAttendance(BuildContext context) async {
     final Position? position = await _fetchLocation();
     if (position == null) {
-      Navigator.pop(context); // Dismiss the loader
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to fetch location'),
@@ -352,12 +293,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     while (true) {
       final LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        final LocationPermission newPermission = await Geolocator.requestPermission();
+        final LocationPermission newPermission = await Geolocator
+            .requestPermission();
         if (newPermission == LocationPermission.deniedForever) {
-          // Permission denied permanently, inform the user and return
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permission is required to mark attendance.'),
+              content: Text(
+                  'Location permission is required to mark attendance.'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 2),
             ),
@@ -368,8 +310,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           continue;
         }
       }
-
-      // If permission is granted or denied temporarily, break the loop and proceed with marking attendance
       break;
     }
 
@@ -455,6 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     });
+
     await Future.delayed(const Duration(seconds: 10));
     Navigator.pop(context); // Dismiss the loader
     ScaffoldMessenger.of(context).showSnackBar(
@@ -465,7 +406,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-
 
   Future<String?> fetchWifiName() async {
     try {
@@ -536,7 +476,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _getGreetingMessage() {
-    final hour = DateTime.now().hour;
+    final hour = DateTime
+        .now()
+        .hour;
     if (hour < 12) {
       return 'Good morning';
     } else if (hour < 17) {
@@ -545,6 +487,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return 'Good Evening';
     }
   }
-
 }
 
