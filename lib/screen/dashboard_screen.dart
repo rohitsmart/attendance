@@ -18,6 +18,7 @@ import 'leave_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String token;
+
   const DashboardScreen(this.token, {Key? key}) : super(key: key);
   @override
   _DashboardScreenState createState() => _DashboardScreenState();
@@ -27,11 +28,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const _leavesIcon = AssetImage('lib/assets/leave.png');
   static const _punchIcon = AssetImage('lib/assets/TimeIn.png');
   late String _token;
+  late String _employeeCode;
+  late Duration _difference = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _token = widget.token;
+    _fetchEmployeeCode();
+    _startTimerFromStoredTime(); // Call the method to start the timer
+
+  }
+  void _startTimerFromStoredTime() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String storedTime = prefs.getString('todayInTime') ?? '00:00:00';
+    final DateTime now = DateTime.now();
+    final String todayDate = DateFormat('yyyy-MM-dd').format(now);
+
+    // Combine today's date and stored time to create a DateTime object
+    final DateTime storedDateTime = DateTime.parse('$todayDate $storedTime');
+    print("stored time $storedDateTime");
+    final Duration difference = now.difference(storedDateTime);
+    print("difference $difference");
+
+    // Update the state with the calculated difference
+    setState(() {
+      _difference = difference;
+    });
+  }
+
+  void _fetchEmployeeCode() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    _employeeCode = prefs.getString('employeeCode') ?? '';
+    _fetchAttendanceData(); // Call _fetchAttendanceData after fetching employee code
+  }
+
+  Future<void> _fetchAttendanceData() async {
+    if (kDebugMode) {
+      print("Fetching attendance data... $_employeeCode");
+    }
+
+    final DateTime today = DateTime.now();
+    final String fromDate = DateFormat('yyyy-MM-dd').format(today.subtract(const Duration(days: 6)));
+    final String toDate = DateFormat('yyyy-MM-dd').format(today);
+
+    final Uri uri = Uri.parse(
+        'http://179.61.188.36:9000/api/reports/attendance?f=$fromDate&t=$toDate&e=$_employeeCode');
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer ${widget.token}'});
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> responseData = json.decode(response.body);
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final DateTime now = DateTime.now();
+      final String todayDate = DateFormat('yyyy-MM-dd').format(now);
+      final String storedDate = prefs.getString('attendanceDate') ?? '';
+      if (storedDate != todayDate) {
+        final List<dynamic> attendanceList = responseData['filterAttendance'];
+        if (attendanceList.isNotEmpty) {
+          prefs.setString('attendanceDate', todayDate);
+          final String inTime = attendanceList[0]['in_time'];
+          prefs.setString('todayInTime', inTime);
+        }
+      }
+
+    } else {
+      // Handle error
+    }
   }
 
   bool isSameDay(DateTime d1, DateTime d2) {
@@ -254,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            TimerText(), // Add TimerText widget here
+            TimerText(initialDuration: _difference),
           ],
         ),
       ),
@@ -341,7 +403,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     responseFuture.then((response) async {
       Navigator.pop(context); // Dismiss the loader
       if (response.statusCode == 200) {
-        // Successful attendance marking
         SharedPreferences prefs = await SharedPreferences.getInstance();
         DateTime now = DateTime.now();
         String formattedDate = DateFormat('yyyy-MM-dd').format(now);

@@ -1,8 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class TimerText extends StatefulWidget {
+  final Duration initialDuration; // Add initialDuration parameter
+
+  const TimerText({Key? key, required this.initialDuration}) : super(key: key);
+
   @override
   _TimerTextState createState() => _TimerTextState();
 }
@@ -14,7 +21,7 @@ class _TimerTextState extends State<TimerText> {
   @override
   void initState() {
     super.initState();
-    _timerText = '00:00:00';
+    _timerText = _formatDuration(widget.initialDuration); // Set initial timer text
     _startTimer();
   }
 
@@ -27,7 +34,7 @@ class _TimerTextState extends State<TimerText> {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        _timerText = _formatDuration(Duration(seconds: timer.tick));
+        _timerText = _formatDuration(Duration(seconds: timer.tick) + widget.initialDuration); // Adjust timer text
       });
     });
   }
