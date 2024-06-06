@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     // Wait for 2 seconds before checking if the response is received
-    await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 2));
 
     responseFuture.then((response) async {
       Navigator.pop(context); // Dismiss the loader
