@@ -44,8 +44,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _startTimerFromStoredTime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? storedTime = prefs.getString('todayInTime');
+    final String? storedDate = prefs.getString('attendanceDate');
+    final DateTime now = DateTime.now();
+    final String todayDate = DateFormat('yyyy-MM-dd').format(now);
 
-    if (storedTime == null) {
+    if (storedTime == null || storedTime.isEmpty || storedDate == null || storedDate != todayDate) {
       final DateTime now = DateTime.now();
       final String currentTime = DateFormat('HH:mm:ss').format(now);
       prefs.setString('todayInTime', currentTime);
@@ -55,79 +58,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    final DateTime now = DateTime.now();
-    final String todayDate = DateFormat('yyyy-MM-dd').format(now);
     final DateTime storedDateTime = DateTime.parse('$todayDate $storedTime');
-
     final Duration difference = now.difference(storedDateTime);
 
     setState(() {
       _difference = difference;
     });
-
-    print('today in time $todayDate');
-    print("stored time $storedDateTime");
-    print("difference $difference");
   }
 
   void _fetchEmployeeCode() async {
-    print('inside _fetchEmployeeCode function');
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     _employeeCode = prefs.getString('employeeCode') ?? '';
     _fetchAttendanceData();
-    print('after  _fetchEmployeeCode function');
-
   }
 
   Future<void> _fetchAttendanceData() async {
+    Completer<void> completer = Completer<void>();
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return Center(
-            child: SizedBox(
-              width: 150,
-              height: 150,
-              child: LoadingAnimationWidget.twistingDots(
-                leftDotColor: const Color(0xFF1A1A3F),
-                rightDotColor: const Color(0xFFEA3799),
-                size: 50,
-              ),
-            ),
+      SharedPreferences? prefs;
+      try {
+        prefs = await SharedPreferences.getInstance();
+      } catch (e) {
+        print('Error initializing SharedPreferences: $e');
+      }
+      if (prefs != null) {
+        final String? loaderFlag = prefs.getString('flag');
+        if (loaderFlag == null || loaderFlag.isEmpty || loaderFlag == 'false') {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return Center(
+                child: SizedBox(
+                  width: 150,
+                  height: 150,
+                  child: LoadingAnimationWidget.twistingDots(
+                    leftDotColor: const Color(0xFF1A1A3F),
+                    rightDotColor: const Color(0xFFEA3799),
+                    size: 50,
+                  ),
+                ),
+              );
+            },
           );
-        },
-      );
-      final DateTime today = DateTime.now();
-      final String todayDate = DateFormat('yyyy-MM-dd').format(today);
-      final Uri uri = Uri.parse(
-          'http://179.61.188.36:9000/api/reports/attendance?f=$todayDate&t=$todayDate&e=$_employeeCode');
-      final response = await http.get(uri, headers: {'Authorization': 'Bearer $_token'});
-      if (response.statusCode == 200) {
-        Navigator.pop(context);
 
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final List<dynamic> attendanceList = responseData['filterAttendance'];
-        if (attendanceList.isNotEmpty) {
-          print('not empty');
-          final String inTime = attendanceList[0]['in_time'];
-          final String outTime = attendanceList[0]['out_time'];
-          prefs.setString('todayInTime', inTime);
-          prefs.setString('todayOutTime', outTime);
-          prefs.setString('attendanceDate', todayDate);
-          if(outTime.isEmpty || outTime == null) {
-            prefs.setString('flag', 'false');
+          // Start maximum duration timer for loader
+          Timer timer = Timer(const Duration(seconds: 10), () {
+            if (!completer.isCompleted) {
+              Navigator.pop(context); // Close loader
+              // Show error snackbar
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Error: Maximum duration exceeded.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              completer.complete(); // Complete the future
+            }
+          });
+
+          final DateTime today = DateTime.now();
+          final String todayDate = DateFormat('yyyy-MM-dd').format(today);
+          final Uri uri = Uri.parse(
+              'http://179.61.188.36:9000/api/reports/attendance?f=$todayDate&t=$todayDate&e=$_employeeCode');
+          final response = await http.get(uri, headers: {'Authorization': 'Bearer $_token'});
+          timer.cancel();
+
+          if (response.statusCode == 200) {
+            Navigator.pop(context); // Close loader
+
+            final Map<String, dynamic> responseData = json.decode(response.body);
+            final List<dynamic> attendanceList = responseData['filterAttendance'];
+            if (attendanceList.isNotEmpty) {
+              print('not empty');
+              final String inTime = attendanceList[0]['in_time'];
+              final String outTime = attendanceList[0]['out_time'];
+              prefs.setString('todayInTime', inTime);
+              prefs.setString('todayOutTime', outTime);
+              prefs.setString('attendanceDate', todayDate);
+              prefs.setString('flag', 'true');
+              _startTimerFromStoredTime();
+            }
+          } else {
+            throw Exception('Failed to fetch attendance data: ${response.reasonPhrase}');
           }
-          _startTimerFromStoredTime();
-
         }
       } else {
-
-        throw Exception('Failed to fetch attendance data: ${response.reasonPhrase}');
+        print('SharedPreferences instance is null.');
+        // Handle the case where SharedPreferences initialization failed
       }
+
+      completer.complete(); // Complete the future after successful execution
     } catch (error) {
       print('Error fetching attendance data: $error');
+      completer.complete(); // Complete the future in case of an error
     }
   }
 
@@ -164,13 +188,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final String todayDate = DateFormat('yyyy-MM-dd').format(now);
       final DateTime inTimeDateTime = DateTime.parse('$todayDate $inTime');
       final Duration difference = now.difference(inTimeDateTime);
-      isPunchOutEnabled = difference.inHours >= 1;
+      isPunchOutEnabled = difference.inHours >= 4;
       if (!isPunchOutEnabled) {
         final Duration remainingDuration = const Duration(hours: 4) - difference;
         remainingTime = '${remainingDuration.inHours} hours and ${remainingDuration.inMinutes.remainder(60)} minutes';
       }
     }
-
     return {
       'fullName': fullName,
       'inTime': inTime,
@@ -547,7 +570,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       {'latitude': 28.609740, 'longitude': 77.450445},
     ];
 
-    double maxDistance = 100;
+    double maxDistance = 30;
     for (var coordinate in coordinates) {
       double distance = Geolocator.distanceBetween(
         latitude,
@@ -564,8 +587,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<String?> _getUserInfo(String key) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString(key);
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (e) {
+      print('Error initializing SharedPreferences: $e');
+    }
+
+    if (prefs != null) {
+      return prefs.getString(key);
+    } else {
+      // Handle the case where SharedPreferences initialization failed
+      return null;
+    }
   }
 
   Future<void> _logout(BuildContext context) async {

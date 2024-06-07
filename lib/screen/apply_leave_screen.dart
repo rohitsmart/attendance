@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+
+import 'dashboard_screen.dart';
 
 class ApplyLeaveScreen extends StatefulWidget {
   final String token;
@@ -12,6 +14,7 @@ class ApplyLeaveScreen extends StatefulWidget {
   @override
   _ApplyLeaveScreenState createState() => _ApplyLeaveScreenState();
 }
+
 class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   final _formKey = GlobalKey<FormState>();
 
@@ -19,71 +22,75 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   late String _note;
   late String _fromDate;
   late String _toDate;
+  late String _email;
+  late String _employeeCode;
+  late String _employeeName;
+  late String _managerCode;
 
   @override
   void initState() {
     super.initState();
     _fetchEmployeeData();
     _setInitialDates();
-
   }
 
   Future<void> _fetchEmployeeData() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String employeeCode = prefs.getString('employeeCode') ?? '';
-    final String email = prefs.getString('userEmail') ?? '';
-    final String token = prefs.getString('token') ?? '';
-    setState(() {
-      // Set initial values for fromDate and toDate
-      _fromDate = DateTime.now().toString();
-      _toDate = DateTime.now().toString();
-    });
+    _employeeCode = prefs.getString('employeeCode') ?? '';
+    _employeeName = prefs.getString('fullName') ?? '';
+    _managerCode = prefs.getString('managerEmpCode') ?? '';
+    _email = prefs.getString('userEmail') ?? '';
+    setState(() {});
   }
+
   void _setInitialDates() {
     _fromDate = _formatDate(DateTime.now());
     _toDate = _formatDate(DateTime.now());
   }
 
   String _formatDate(DateTime date) {
-    return DateFormat('d M y').format(date);
+    return DateFormat('yyyy-MM-dd').format(date);
   }
+
   Future<void> _submitLeaveRequest() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String employeeCode = prefs.getString('employeeCode') ?? '';
-      final String employeeName = prefs.getString('employeeName') ?? '';
-      final String managerCode = prefs.getString('managerCode') ?? '';
-      final String email = prefs.getString('userEmail') ?? '';
-
       final Map<String, dynamic> payload = {
         'leaveType': _leaveType,
-        'email': [email],
+        'email': [_email],
         'note': _note,
         'fromDate': _fromDate,
         'toDate': _toDate,
-        'employeeCode': employeeCode,
-        'employeeName': employeeName,
-        'managerCode': managerCode,
+        'employeeCode': _employeeCode,
+        'employeeName': _employeeName,
+        'managerCode': _managerCode,
       };
 
       final Uri uri = Uri.parse('http://179.61.188.36:9000/api/leave/create');
       final response = await http.post(
         uri,
-        headers: {'Authorization': 'Bearer ${widget.token}'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}'
+        },
         body: json.encode(payload),
       );
 
       if (response.statusCode == 200) {
         // Leave request submitted successfully
+        await Future.delayed(const Duration(seconds: 2));
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Leave request submitted successfully'),
             backgroundColor: Colors.green,
           ),
         );
-
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardScreen(widget.token)),
+        );
       } else {
         // Error submitting leave request
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,9 +110,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked != null && picked != DateTime.parse(_fromDate)) {
+    if (picked != null) {
       setState(() {
-        _fromDate = DateFormat('d M y').format(picked);
+        _fromDate = _formatDate(picked);
       });
     }
   }
@@ -117,9 +124,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked != null && picked != DateTime.parse(_toDate)) {
+    if (picked != null) {
       setState(() {
-        _toDate = DateFormat('d M y').format(picked);
+        _toDate = _formatDate(picked);
       });
     }
   }
@@ -130,7 +137,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       appBar: AppBar(
         title: const Text('Apply for Leave'),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
@@ -138,7 +145,10 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DropdownButtonFormField<String>(
-                decoration: InputDecoration(labelText: 'Leave Type'),
+                decoration: const InputDecoration(
+                  labelText: 'Leave Type',
+                  border: OutlineInputBorder(),
+                ),
                 value: _leaveType,
                 items: ['PL', 'UL', 'CL', 'SL']
                     .map<DropdownMenuItem<String>>(
@@ -160,8 +170,12 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   });
                 },
               ),
+              const SizedBox(height: 20),
               TextFormField(
-                decoration: InputDecoration(labelText: 'Note'),
+                decoration: const InputDecoration(
+                  labelText: 'Note',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a note';
@@ -170,26 +184,34 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                 },
                 onSaved: (value) => _note = value!,
               ),
+              const SizedBox(height: 20),
               TextFormField(
-                decoration: InputDecoration(labelText: 'From Date'),
+                decoration: const InputDecoration(
+                  labelText: 'From Date',
+                  border: OutlineInputBorder(),
+                ),
                 readOnly: true,
                 controller: TextEditingController(text: _fromDate),
                 onTap: () => _selectFromDate(context),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter from date';
+                    return 'Please select from date';
                   }
                   return null;
                 },
               ),
+              const SizedBox(height: 20),
               TextFormField(
-                decoration: InputDecoration(labelText: 'To Date'),
+                decoration: const InputDecoration(
+                  labelText: 'To Date',
+                  border: OutlineInputBorder(),
+                ),
                 readOnly: true,
                 controller: TextEditingController(text: _toDate),
                 onTap: () => _selectToDate(context),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter to date';
+                    return 'Please select to date';
                   }
                   return null;
                 },

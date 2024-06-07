@@ -1,5 +1,7 @@
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -33,8 +35,20 @@ class Leave {
       hrApproval: json['hr_leave_status'],
     );
   }
-}
 
+  Color getStatusColor() {
+    if (managerApproval == 'approved' || hrApproval == 'approved') {
+      return Colors.green;
+    }
+    else if (managerApproval == 'rejected' || hrApproval == 'rejected') {
+      return Colors.red;
+    }
+    else {
+      return Colors.orange;
+    }
+  }
+
+}
 
 class MyLeavesScreen extends StatefulWidget {
   final String token;
@@ -55,6 +69,23 @@ class _MyLeavesScreenState extends State<MyLeavesScreen> {
   }
 
   Future<void> _fetchLeaveRecords() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: SizedBox(
+            width: 150,
+            height: 150,
+            child: LoadingAnimationWidget.twistingDots(
+              leftDotColor: const Color(0xFF1A1A3F),
+              rightDotColor: const Color(0xFFEA3799),
+              size: 50,
+            ),
+          ),
+        );
+      },
+    );
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String token = prefs.getString('token') ?? '';
 
@@ -62,10 +93,13 @@ class _MyLeavesScreenState extends State<MyLeavesScreen> {
     final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
     if (response.statusCode == 200) {
+
       final List<dynamic> responseData = json.decode(response.body)['result'];
       setState(() {
         _leaveRecords = responseData.map((data) => Leave.fromJson(data)).toList();
       });
+      Navigator.pop(context); // Dismiss the loader
+
     } else {
       // Handle error
     }
@@ -102,8 +136,14 @@ class _MyLeavesScreenState extends State<MyLeavesScreen> {
                     Text('From Date: ${leave.fromDate}'),
                     Text('To Date: ${leave.toDate}'),
                     Text('Note: ${leave.note}'),
-                    Text('Manager Approval: ${leave.managerApproval}'),
-                    Text('HR Approval: ${leave.hrApproval}'),
+                    Text(
+                      'Manager Approval: ${leave.managerApproval}',
+                      style: TextStyle(color: leave.getStatusColor()),
+                    ),
+                    Text(
+                      'HR Approval: ${leave.hrApproval}',
+                      style: TextStyle(color: leave.getStatusColor()),
+                    ),
                   ],
                 ),
               ),

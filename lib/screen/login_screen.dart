@@ -122,8 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
-        // Delay navigation to the next screen by 2 seconds
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
 
         Navigator.pushReplacement(
           context,
@@ -154,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     // Wait for 10 seconds before showing error if the response is not received
-    await Future.delayed(Duration(seconds: 10));
+    await Future.delayed(const Duration(seconds: 10));
     Navigator.pop(context); // Dismiss the loader
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -174,27 +173,44 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'Your email without @perfectkode.com',
-              ),
-            ),
-          TextFormField(
-            controller: passwordController,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _isObscure ? Icons.visibility : Icons.visibility_off,
-                  color: Colors.grey,
+            Stack(
+              children: [
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'Your email ',
+                    contentPadding: EdgeInsets.only(right: 150),
+                  ),
                 ),
-                onPressed: _togglePasswordVisibility,
-              ),
+                Positioned(
+                  right: 0,
+                  top: 15,
+                  child: Text(
+                    '@perfectkode.com',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            obscureText: _isObscure,
-          ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: passwordController,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isObscure ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.grey,
+                  ),
+                  onPressed: _togglePasswordVisibility,
+                ),
+              ),
+              obscureText: _isObscure,
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => _login(context),
@@ -206,3 +222,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
